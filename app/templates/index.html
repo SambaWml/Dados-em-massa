@@ -122,7 +122,10 @@
       padding: 8px 12px;
       background: #fafafa;
       margin-bottom: 6px;
+      transition: opacity .15s;
     }
+    .sel-item.dragging { opacity: .4; }
+    .sel-item.drag-over { border-color: var(--primary); background: var(--primary-light); }
     .sel-item-header {
       display: flex;
       justify-content: space-between;
@@ -130,6 +133,24 @@
       font-size: .83rem;
     }
     .sel-item-filters { margin-top: 8px; }
+    .drag-handle {
+      cursor: grab;
+      color: var(--text-muted);
+      padding: 0 4px;
+      font-size: .8rem;
+    }
+    .drag-handle:active { cursor: grabbing; }
+    .btn-move {
+      background: none;
+      border: none;
+      padding: 0 3px;
+      font-size: .7rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      line-height: 1;
+    }
+    .btn-move:hover { color: var(--primary); }
+    .btn-move:disabled { opacity: .25; cursor: default; }
 
     /* ── Generate button ────────────────────────────────────────────── */
     .btn-generate {
@@ -334,7 +355,7 @@
 // ── State ──────────────────────────────────────────────────────────────────
 const S = {
   fieldDefs:  {},   // key → field definition object
-  selected:   new Set(),
+  selected:   [],   // ordered array of selected field keys
   filters:    {},   // fieldKey → { filterKey: value }
   data:       [],   // generated records (all)
   sessionKey: null,
@@ -383,20 +404,21 @@ function renderFieldGrid(categories) {
 
 // ── Toggle field selection ─────────────────────────────────────────────────
 function toggleField(key) {
-  if (S.selected.has(key)) {
-    S.selected.delete(key);
+  const idx = S.selected.indexOf(key);
+  if (idx !== -1) {
+    S.selected.splice(idx, 1);
     delete S.filters[key];
   } else {
-    S.selected.add(key);
+    S.selected.push(key);
   }
   const card = document.getElementById('fc-' + key);
-  if (card) card.classList.toggle('selected', S.selected.has(key));
+  if (card) card.classList.toggle('selected', S.selected.includes(key));
   renderSelected();
 }
 
 function selectAll() {
   Object.keys(S.fieldDefs).forEach(k => {
-    S.selected.add(k);
+    if (!S.selected.includes(k)) S.selected.push(k);
     const c = document.getElementById('fc-' + k);
     if (c) c.classList.add('selected');
   });
@@ -408,18 +430,71 @@ function selectNone() {
     const c = document.getElementById('fc-' + k);
     if (c) c.classList.remove('selected');
   });
-  S.selected.clear();
+  S.selected.length = 0;
   S.filters = {};
+  renderSelected();
+}
+
+// ── Column reorder ─────────────────────────────────────────────────────────
+function moveField(key, dir) {
+  const idx = S.selected.indexOf(key);
+  if (idx === -1) return;
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= S.selected.length) return;
+  S.selected.splice(idx, 1);
+  S.selected.splice(newIdx, 0, key);
+  renderSelected();
+  // Restore open filter panels
+  const fp = document.getElementById('fp-' + key);
+  if (fp) fp.style.display = 'none'; // reset on reorder (safe default)
+}
+
+// ── Drag-and-drop reorder ──────────────────────────────────────────────────
+let _dragKey = null;
+
+function onDragStart(e, key) {
+  _dragKey = key;
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(() => {
+    const el = document.getElementById('si-' + key);
+    if (el) el.classList.add('dragging');
+  }, 0);
+}
+
+function onDragEnd(key) {
+  const el = document.getElementById('si-' + key);
+  if (el) el.classList.remove('dragging');
+  document.querySelectorAll('.sel-item').forEach(el => el.classList.remove('drag-over'));
+  _dragKey = null;
+}
+
+function onDragOver(e, key) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.sel-item').forEach(el => el.classList.remove('drag-over'));
+  const el = document.getElementById('si-' + key);
+  if (el && _dragKey !== key) el.classList.add('drag-over');
+}
+
+function onDrop(e, key) {
+  e.preventDefault();
+  document.querySelectorAll('.sel-item').forEach(el => el.classList.remove('drag-over'));
+  if (!_dragKey || _dragKey === key) return;
+  const fromIdx = S.selected.indexOf(_dragKey);
+  const toIdx   = S.selected.indexOf(key);
+  if (fromIdx === -1 || toIdx === -1) return;
+  S.selected.splice(fromIdx, 1);
+  S.selected.splice(toIdx, 0, _dragKey);
   renderSelected();
 }
 
 // ── Render selected panel ──────────────────────────────────────────────────
 function renderSelected() {
-  document.getElementById('sel-count').textContent = S.selected.size;
+  document.getElementById('sel-count').textContent = S.selected.length;
   const container = document.getElementById('sel-container');
   const emptyEl   = document.getElementById('empty-sel');
 
-  if (S.selected.size === 0) {
+  if (S.selected.length === 0) {
     container.innerHTML = '';
     emptyEl.style.display = '';
     container.appendChild(emptyEl);
@@ -427,19 +502,34 @@ function renderSelected() {
   }
   emptyEl.style.display = 'none';
 
+  const total = S.selected.length;
   let html = '';
-  S.selected.forEach(key => {
+  S.selected.forEach((key, idx) => {
     const f = S.fieldDefs[key];
     if (!f) return;
     const hasFilters = f.filter_options && f.filter_options.length > 0;
     html += `
-      <div class="sel-item">
+      <div class="sel-item" id="si-${key}"
+        draggable="true"
+        ondragstart="onDragStart(event,'${key}')"
+        ondragend="onDragEnd('${key}')"
+        ondragover="onDragOver(event,'${key}')"
+        ondrop="onDrop(event,'${key}')">
         <div class="sel-item-header">
-          <span>
-            <i class="${f.icon} me-1" style="color:var(--primary)"></i>
+          <span class="d-flex align-items-center gap-1">
+            <span class="drag-handle" title="Arraste para reordenar"><i class="fas fa-grip-vertical"></i></span>
+            <i class="${f.icon}" style="color:var(--primary)"></i>
             <strong>${f.label}</strong>
           </span>
-          <div class="d-flex gap-1">
+          <div class="d-flex align-items-center gap-1">
+            <button class="btn-move" title="Mover para cima"
+              onclick="moveField('${key}',-1)" ${idx === 0 ? 'disabled' : ''}>
+              <i class="fas fa-chevron-up"></i>
+            </button>
+            <button class="btn-move" title="Mover para baixo"
+              onclick="moveField('${key}',1)" ${idx === total - 1 ? 'disabled' : ''}>
+              <i class="fas fa-chevron-down"></i>
+            </button>
             ${hasFilters ? `
               <button class="btn btn-xs btn-link p-0" style="font-size:.75rem"
                 onclick="toggleFiltersPanel('${key}')">
@@ -514,7 +604,7 @@ function setFilter(fieldKey, filterKey, value) {
 
 // ── Generate ───────────────────────────────────────────────────────────────
 async function onGenerate() {
-  const fields = Array.from(S.selected);
+  const fields = [...S.selected];
   if (!fields.length) { showAlert('Selecione pelo menos um campo!', 'warning'); return; }
 
   const qty = parseInt(document.getElementById('qty').value, 10);
