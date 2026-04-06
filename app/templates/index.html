@@ -291,10 +291,6 @@
           </span>
         </div>
         <div class="card-body selected-scroll" id="sel-container">
-          <div class="empty-msg" id="empty-sel">
-            <i class="fas fa-hand-pointer"></i>
-            Clique nos campos ao lado para selecioná-los
-          </div>
         </div>
       </div>
     </div>
@@ -492,15 +488,15 @@ function onDrop(e, key) {
 function renderSelected() {
   document.getElementById('sel-count').textContent = S.selected.length;
   const container = document.getElementById('sel-container');
-  const emptyEl   = document.getElementById('empty-sel');
 
   if (S.selected.length === 0) {
-    container.innerHTML = '';
-    emptyEl.style.display = '';
-    container.appendChild(emptyEl);
+    container.innerHTML = `
+      <div class="empty-msg">
+        <i class="fas fa-hand-pointer"></i>
+        Clique nos campos ao lado para selecioná-los
+      </div>`;
     return;
   }
-  emptyEl.style.display = 'none';
 
   const total = S.selected.length;
   let html = '';
