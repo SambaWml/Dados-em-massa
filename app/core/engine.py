@@ -7,6 +7,7 @@ Flow per record:
   2. Generate each field in dependency-resolved order, accumulating
      values in the context dict so dependent generators can read them.
 """
+import json
 import logging
 import time
 import uuid
@@ -103,10 +104,24 @@ def generate(fields: List[str], count: int, filters: Dict[str, Any]) -> Dict:
     needs_location = bool(_LOCATION_FIELDS & set(fields))
     genero         = _gender_from_filters(fields, filters)
 
-    records = [
-        _generate_record(ordered, filters, needs_name, genero, needs_location)
-        for _ in range(count)
-    ]
+    records: List[Dict] = []
+    seen: set = set()
+    max_attempts = count * 10
+
+    for _ in range(max_attempts):
+        if len(records) >= count:
+            break
+        record = _generate_record(ordered, filters, needs_name, genero, needs_location)
+        signature = json.dumps(record, sort_keys=True, default=str)
+        if signature not in seen:
+            seen.add(signature)
+            records.append(record)
+
+    if len(records) < count:
+        logger.warning(
+            "Só foi possível gerar %d registros únicos de %d solicitados.",
+            len(records), count,
+        )
 
     elapsed_ms = int((time.time() - t0) * 1000)
 
