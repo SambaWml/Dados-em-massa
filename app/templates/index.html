@@ -167,6 +167,21 @@
     .btn-generate:hover:not(:disabled) { opacity: .9; transform: translateY(-1px); }
     .btn-generate:disabled { opacity: .6; }
 
+    /* ── Save button ─────────────────────────────────────────────────── */
+    .btn-save {
+      background: linear-gradient(135deg, #16A34A 0%, #15803D 100%);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 18px;
+      font-weight: 600;
+      font-size: .95rem;
+      white-space: nowrap;
+      transition: opacity .15s, transform .1s;
+    }
+    .btn-save:hover { opacity: .9; transform: translateY(-1px); }
+    .btn-save:active { transform: translateY(0); }
+
     /* ── Preview table ──────────────────────────────────────────────── */
     #preview-table { font-size: .78rem; }
     #preview-table th {
@@ -235,22 +250,27 @@
       <div class="card">
         <div class="card-body py-2">
           <div class="row align-items-end g-2">
-            <div class="col-sm-5 col-md-4">
+            <div class="col-sm-5 col-md-3">
               <label class="form-label fw-semibold mb-1 small">Quantidade de Registros</label>
               <div class="input-group input-group-sm">
-                <input type="number" id="qty" class="form-control" value="100" min="1" max="50000" onchange="saveState()" />
+                <input type="number" id="qty" class="form-control" value="100" min="1" max="50000" />
                 <span class="input-group-text">registros</span>
               </div>
             </div>
-            <div class="col-sm-4 col-md-3">
-              <label class="form-label fw-semibold mb-1 small">Formato de Exportação</label>
-              <select id="fmt" class="form-select form-select-sm" onchange="saveState()">
-                <option value="csv">CSV (.csv)</option>
-                <option value="json">JSON (.json)</option>
-                <option value="excel">Excel (.xlsx)</option>
+            <div class="col-sm-4 col-md-2">
+              <label class="form-label fw-semibold mb-1 small">Formato</label>
+              <select id="fmt" class="form-select form-select-sm">
+                <option value="csv">CSV</option>
+                <option value="json">JSON</option>
+                <option value="excel">Excel</option>
               </select>
             </div>
-            <div class="col-sm-3 col-md-5">
+            <div class="col-sm-3 col-md-2">
+              <button class="btn-save w-100" id="save-btn" onclick="onSave()">
+                <i class="fas fa-floppy-disk me-2"></i>Salvar
+              </button>
+            </div>
+            <div class="col-sm-12 col-md-5">
               <button class="btn-generate" id="gen-btn" onclick="onGenerate()">
                 <i class="fas fa-bolt me-2"></i>Gerar Dados
               </button>
@@ -376,6 +396,19 @@ function saveState() {
   } catch (e) {
     console.error('[saveState] Falha ao salvar no localStorage:', e);
   }
+}
+
+function onSave() {
+  saveState();
+  const btn = document.getElementById('save-btn');
+  if (!btn) return;
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<i class="fas fa-check me-2"></i>Salvo!';
+  btn.disabled = true;
+  setTimeout(() => {
+    btn.innerHTML = orig;
+    btn.disabled = false;
+  }, 1800);
 }
 
 function flashSaved() {
