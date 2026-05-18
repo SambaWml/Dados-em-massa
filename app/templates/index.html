@@ -218,7 +218,10 @@
 <!-- ── Navbar ──────────────────────────────────────────────────────────────── -->
 <div class="app-navbar">
   <span class="brand"><i class="fas fa-database"></i>Gerador de Dados em Massa</span>
-  <span class="badge-version">v1.0</span>
+  <div class="d-flex align-items-center gap-2">
+    <span id="save-badge" style="opacity:0;transition:opacity .4s;font-size:.72rem;color:#86efac;"><i class="fas fa-check-circle me-1"></i>Salvo</span>
+    <span class="badge-version">v1.0</span>
+  </div>
 </div>
 
 <div class="container-fluid py-3 px-3">
@@ -361,43 +364,68 @@ const S = {
 const STORAGE_KEY = 'dados_em_massa_v1';
 
 function saveState() {
+  const data = {
+    selected: S.selected,
+    filters:  S.filters,
+    qty:      document.getElementById('qty') ? document.getElementById('qty').value : '100',
+    fmt:      document.getElementById('fmt') ? document.getElementById('fmt').value : 'csv',
+  };
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      selected: S.selected,
-      filters:  S.filters,
-      qty:      document.getElementById('qty')?.value,
-      fmt:      document.getElementById('fmt')?.value,
-    }));
-  } catch (_) {}
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    flashSaved();
+  } catch (e) {
+    console.error('[saveState] Falha ao salvar no localStorage:', e);
+  }
+}
+
+function flashSaved() {
+  const badge = document.getElementById('save-badge');
+  if (!badge) return;
+  badge.style.opacity = '1';
+  clearTimeout(badge._t);
+  badge._t = setTimeout(() => { badge.style.opacity = '0'; }, 1500);
 }
 
 function loadPersistedState() {
+  let raw;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    const saved = JSON.parse(raw);
-    // Only restore keys that actually exist in fieldDefs
-    const validKeys = Object.keys(S.fieldDefs);
-    if (Array.isArray(saved.selected)) {
-      S.selected = saved.selected.filter(k => validKeys.includes(k));
-    }
-    if (saved.filters && typeof saved.filters === 'object') {
-      S.filters = saved.filters;
-    }
-    if (saved.qty) {
-      const el = document.getElementById('qty');
-      if (el) el.value = saved.qty;
-    }
-    if (saved.fmt) {
-      const el = document.getElementById('fmt');
-      if (el) el.value = saved.fmt;
-    }
-    // Mark field cards as selected visually
-    S.selected.forEach(k => {
-      const card = document.getElementById('fc-' + k);
-      if (card) card.classList.add('selected');
-    });
-  } catch (_) {}
+    raw = localStorage.getItem(STORAGE_KEY);
+  } catch (e) {
+    console.error('[loadPersistedState] localStorage indisponível:', e);
+    return;
+  }
+  if (!raw) return;
+
+  let saved;
+  try {
+    saved = JSON.parse(raw);
+  } catch (e) {
+    console.error('[loadPersistedState] JSON inválido, limpando:', e);
+    localStorage.removeItem(STORAGE_KEY);
+    return;
+  }
+
+  const validKeys = Object.keys(S.fieldDefs);
+
+  if (Array.isArray(saved.selected)) {
+    S.selected = saved.selected.filter(k => validKeys.includes(k));
+  }
+  if (saved.filters && typeof saved.filters === 'object') {
+    S.filters = saved.filters;
+  }
+  if (saved.qty) {
+    const el = document.getElementById('qty');
+    if (el) el.value = saved.qty;
+  }
+  if (saved.fmt) {
+    const el = document.getElementById('fmt');
+    if (el) el.value = saved.fmt;
+  }
+
+  S.selected.forEach(k => {
+    const card = document.getElementById('fc-' + k);
+    if (card) card.classList.add('selected');
+  });
 }
 
 // ── Boot ───────────────────────────────────────────────────────────────────
