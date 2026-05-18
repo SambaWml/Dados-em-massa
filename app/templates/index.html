@@ -235,13 +235,13 @@
             <div class="col-sm-5 col-md-4">
               <label class="form-label fw-semibold mb-1 small">Quantidade de Registros</label>
               <div class="input-group input-group-sm">
-                <input type="number" id="qty" class="form-control" value="100" min="1" max="50000" />
+                <input type="number" id="qty" class="form-control" value="100" min="1" max="50000" onchange="saveState()" />
                 <span class="input-group-text">registros</span>
               </div>
             </div>
             <div class="col-sm-4 col-md-3">
               <label class="form-label fw-semibold mb-1 small">Formato de Exportação</label>
-              <select id="fmt" class="form-select form-select-sm">
+              <select id="fmt" class="form-select form-select-sm" onchange="saveState()">
                 <option value="csv">CSV (.csv)</option>
                 <option value="json">JSON (.json)</option>
                 <option value="excel">Excel (.xlsx)</option>
@@ -358,6 +358,48 @@ const S = {
   fieldsLabels: [],
 };
 
+const STORAGE_KEY = 'dados_em_massa_v1';
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      selected: S.selected,
+      filters:  S.filters,
+      qty:      document.getElementById('qty')?.value,
+      fmt:      document.getElementById('fmt')?.value,
+    }));
+  } catch (_) {}
+}
+
+function loadPersistedState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    // Only restore keys that actually exist in fieldDefs
+    const validKeys = Object.keys(S.fieldDefs);
+    if (Array.isArray(saved.selected)) {
+      S.selected = saved.selected.filter(k => validKeys.includes(k));
+    }
+    if (saved.filters && typeof saved.filters === 'object') {
+      S.filters = saved.filters;
+    }
+    if (saved.qty) {
+      const el = document.getElementById('qty');
+      if (el) el.value = saved.qty;
+    }
+    if (saved.fmt) {
+      const el = document.getElementById('fmt');
+      if (el) el.value = saved.fmt;
+    }
+    // Mark field cards as selected visually
+    S.selected.forEach(k => {
+      const card = document.getElementById('fc-' + k);
+      if (card) card.classList.add('selected');
+    });
+  } catch (_) {}
+}
+
 // ── Boot ───────────────────────────────────────────────────────────────────
 (async function init() {
   try {
@@ -367,7 +409,14 @@ const S = {
       cat.fields.forEach(f => { S.fieldDefs[f.key] = f; });
     });
     renderFieldGrid(body.categories);
-    log('info', `${Object.keys(S.fieldDefs).length} campos disponíveis carregados.`);
+    loadPersistedState();
+    renderSelected();
+    const savedCount = S.selected.length;
+    if (savedCount > 0) {
+      log('info', `${Object.keys(S.fieldDefs).length} campos carregados. ${savedCount} campo(s) restaurado(s) da sessão anterior.`);
+    } else {
+      log('info', `${Object.keys(S.fieldDefs).length} campos disponíveis carregados.`);
+    }
   } catch (e) {
     alert('Falha ao carregar campos: ' + e.message);
   }
@@ -410,6 +459,7 @@ function toggleField(key) {
   const card = document.getElementById('fc-' + key);
   if (card) card.classList.toggle('selected', S.selected.includes(key));
   renderSelected();
+  saveState();
 }
 
 function selectAll() {
@@ -419,6 +469,7 @@ function selectAll() {
     if (c) c.classList.add('selected');
   });
   renderSelected();
+  saveState();
 }
 
 function selectNone() {
@@ -429,6 +480,7 @@ function selectNone() {
   S.selected.length = 0;
   S.filters = {};
   renderSelected();
+  saveState();
 }
 
 // ── Column reorder ─────────────────────────────────────────────────────────
@@ -440,9 +492,9 @@ function moveField(key, dir) {
   S.selected.splice(idx, 1);
   S.selected.splice(newIdx, 0, key);
   renderSelected();
-  // Restore open filter panels
+  saveState();
   const fp = document.getElementById('fp-' + key);
-  if (fp) fp.style.display = 'none'; // reset on reorder (safe default)
+  if (fp) fp.style.display = 'none';
 }
 
 // ── Drag-and-drop reorder ──────────────────────────────────────────────────
@@ -482,6 +534,7 @@ function onDrop(e, key) {
   S.selected.splice(fromIdx, 1);
   S.selected.splice(toIdx, 0, _dragKey);
   renderSelected();
+  saveState();
 }
 
 // ── Render selected panel ──────────────────────────────────────────────────
@@ -593,9 +646,9 @@ function renderFilterOptions(fieldKey, opts) {
 
 function setFilter(fieldKey, filterKey, value) {
   if (!S.filters[fieldKey]) S.filters[fieldKey] = {};
-  // Try to coerce numbers
   const num = Number(value);
   S.filters[fieldKey][filterKey] = isNaN(num) || value === '' ? value : num;
+  saveState();
 }
 
 // ── Generate ───────────────────────────────────────────────────────────────

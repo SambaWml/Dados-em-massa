@@ -34,8 +34,20 @@ def gen_estado(context: Dict, filters: Dict) -> str:
     return loc['uf'] if fmt == 'sigla' else loc['estado']
 
 
+PAISES = [
+    'Brasil', 'Argentina', 'Chile', 'Colômbia', 'Peru', 'Venezuela',
+    'Equador', 'Bolívia', 'Paraguai', 'Uruguai', 'México', 'Canadá',
+    'Estados Unidos', 'Portugal', 'Espanha', 'França', 'Alemanha',
+    'Itália', 'Reino Unido', 'Japão', 'China', 'Índia', 'Austrália',
+    'África do Sul', 'Angola', 'Moçambique', 'Cabo Verde',
+]
+
+
 def gen_pais(context: Dict, filters: Dict) -> str:
-    return 'Brasil'
+    escolha = filters.get('pais', 'aleatorio')
+    if escolha == 'aleatorio':
+        return random.choice(PAISES)
+    return escolha
 
 
 # ---------------------------------------------------------------------------
@@ -104,6 +116,42 @@ register_field(FieldDefinition(
     key='pais', label='País',
     category='endereco', category_label='Endereço',
     generator=gen_pais,
-    description='País (Brasil)',
+    filter_options=[
+        FilterOption(
+            key='pais', label='País', type='select',
+            options=[
+                {'value': 'aleatorio',      'label': 'Aleatório'},
+                {'value': 'Brasil',          'label': 'Brasil'},
+                {'value': 'Argentina',       'label': 'Argentina'},
+                {'value': 'Chile',           'label': 'Chile'},
+                {'value': 'Colômbia',        'label': 'Colômbia'},
+                {'value': 'Peru',            'label': 'Peru'},
+                {'value': 'Venezuela',       'label': 'Venezuela'},
+                {'value': 'Equador',         'label': 'Equador'},
+                {'value': 'Bolívia',         'label': 'Bolívia'},
+                {'value': 'Paraguai',        'label': 'Paraguai'},
+                {'value': 'Uruguai',         'label': 'Uruguai'},
+                {'value': 'México',          'label': 'México'},
+                {'value': 'Canadá',          'label': 'Canadá'},
+                {'value': 'Estados Unidos',  'label': 'Estados Unidos'},
+                {'value': 'Portugal',        'label': 'Portugal'},
+                {'value': 'Espanha',         'label': 'Espanha'},
+                {'value': 'França',          'label': 'França'},
+                {'value': 'Alemanha',        'label': 'Alemanha'},
+                {'value': 'Itália',          'label': 'Itália'},
+                {'value': 'Reino Unido',     'label': 'Reino Unido'},
+                {'value': 'Japão',           'label': 'Japão'},
+                {'value': 'China',           'label': 'China'},
+                {'value': 'Índia',           'label': 'Índia'},
+                {'value': 'Austrália',       'label': 'Austrália'},
+                {'value': 'África do Sul',   'label': 'África do Sul'},
+                {'value': 'Angola',          'label': 'Angola'},
+                {'value': 'Moçambique',      'label': 'Moçambique'},
+                {'value': 'Cabo Verde',      'label': 'Cabo Verde'},
+            ],
+            default='aleatorio',
+        ),
+    ],
+    description='País de origem (aleatório ou específico)',
     icon='fas fa-globe-americas',
 ))
